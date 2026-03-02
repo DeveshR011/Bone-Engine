@@ -1,6 +1,6 @@
 # 🦴 Bone Engine
 
-> **A research-grade hybrid semantic search system** — combining sparse SPLADE retrieval, dense vector search, graph expansion, and RAG generation into a unified, benchmarkable pipeline.
+> **A research grade hybrid semantic search system**  combining sparse SPLADE retrieval, dense vector search, graph expansion, and RAG generation into a unified, benchmarkable pipeline.
 
 ---
 
