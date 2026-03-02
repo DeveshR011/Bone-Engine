@@ -1,0 +1,120 @@
+# =============================================================================
+# Vectorless Semantic Search System — Docker Compose
+# =============================================================================
+# Usage:
+#   docker-compose up -d elasticsearch postgres   # start infra
+#   docker-compose up --build engine              # build + run engine
+#   docker-compose run --rm engine python scripts/run_queries.py --config config.docker.yaml
+#
+# GPU usage (requires NVIDIA Container Toolkit):
+#   docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up --build engine
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Elasticsearch 8.x — security disabled for local research
+  # ---------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: vectorless-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS:--Xms512m -Xmx512m}
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - search-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 15
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: vectorless-pg
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-research_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-vectorless_search}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - search-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Semantic Search Engine (CPU)
+  # ---------------------------------------------------------------------------
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vectorless-engine
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      # Mount config so it can be edited without rebuild
+      - ./config.docker.yaml:/app/config.docker.yaml:ro
+      # Persist data artifacts and results across runs
+      - ./data:/app/data
+      - ./results:/app/results
+      # Cache HuggingFace models across rebuilds
+      - hf_cache:/app/.cache/huggingface
+    networks:
+      - search-net
+    ports:
+      - "8000:8000"
+    # Default: index documents. Override per-run:
+    #   docker-compose run --rm engine python scripts/run_queries.py --config config.docker.yaml
+    command: >
+      python scripts/index_documents.py --config config.docker.yaml
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  es_data:
+    driver: local
+  pg_data:
+    driver: local
+  hf_cache:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  search-net:
+    driver: bridge

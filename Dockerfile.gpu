@@ -1,0 +1,62 @@
+# =============================================================================
+# Vectorless Semantic Search System — Dockerfile (GPU / CUDA 12.1)
+# =============================================================================
+# Build:   docker build -f Dockerfile.gpu -t vectorless-search:gpu .
+# Run:     docker run --gpus all --rm -it vectorless-search:gpu \
+#              python scripts/benchmark_gpu_vs_cpu.py --config config.docker.yaml
+#
+# Prerequisites:
+#   1. NVIDIA GPU driver installed on host (nvidia-smi must work)
+#   2. NVIDIA Container Toolkit installed:
+#      https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+# =============================================================================
+
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
+
+# ---- Install Python 3.10 + system deps --------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        python3.10 \
+        python3.10-venv \
+        python3.10-dev \
+        python3-pip \
+        build-essential \
+        gcc \
+        g++ \
+        git \
+        curl \
+        libpq-dev \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ---- Install PyTorch with CUDA first (large cached layer) -------------------
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu121
+
+# ---- Install remaining Python dependencies -----------------------------------
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ---- Copy project source -----------------------------------------------------
+COPY src/ src/
+COPY scripts/ scripts/
+COPY config.yaml config.yaml
+COPY config.docker.yaml config.docker.yaml
+
+RUN mkdir -p data results .cache/huggingface
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HF_HOME=/app/.cache/huggingface \
+    TRANSFORMERS_CACHE=/app/.cache/huggingface \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+EXPOSE 8000
+
+CMD ["python", "scripts/index_documents.py", "--config", "config.docker.yaml"]

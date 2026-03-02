@@ -1,0 +1,5 @@
+{"query_id": "q1", "text": "What is information retrieval?"}
+{"query_id": "q2", "text": "How do neural networks work?"}
+{"query_id": "q3", "text": "What is SPLADE sparse retrieval?"}
+{"query_id": "q4", "text": "How does hybrid search combine sparse and dense retrieval?"}
+{"query_id": "q5", "text": "What is retrieval augmented generation?"}

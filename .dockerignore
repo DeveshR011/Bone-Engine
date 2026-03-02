@@ -1,0 +1,41 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+dist
+build
+venv
+.venv
+*.egg
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker (prevent recursive copy)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Large artifacts (rebuilt inside container)
+data/hnsw_sparse.index*
+data/faiss_dense.index*
+data/dense_embeddings.npy
+data/splade_sparse.jsonl
+results/experiments.csv
+results/query_results.jsonl
+
+# HuggingFace model cache (downloaded at runtime)
+.cache

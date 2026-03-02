@@ -1,0 +1,15 @@
+{"doc_id": "d1", "content": "Information retrieval is the process of obtaining information system resources relevant to an information need from a collection. It covers searching within documents, databases, and the internet."}
+{"doc_id": "d2", "content": "Machine learning models can be used for various tasks including classification, regression, and clustering. Neural networks are one of the most powerful machine learning techniques."}
+{"doc_id": "d3", "content": "Natural language processing is a subfield of artificial intelligence that deals with the interaction between computers and humans using natural language."}
+{"doc_id": "d4", "content": "Dense vector retrieval uses neural encoders to map text into high-dimensional embedding spaces where semantic similarity can be measured by cosine or dot-product distance."}
+{"doc_id": "d5", "content": "SPLADE is a sparse retrieval model that learns importance weights for BERT vocabulary terms, producing sparse representations that can be efficiently indexed with inverted indexes."}
+{"doc_id": "d6", "content": "Hybrid search combines sparse and dense retrieval signals to achieve better recall and precision than either method alone. Fusion strategies include linear combination and reciprocal rank fusion."}
+{"doc_id": "d7", "content": "Graph-based document expansion leverages document-document similarity graphs to improve retrieval by incorporating neighborhood information and multi-hop relationships."}
+{"doc_id": "d8", "content": "Retrieval-Augmented Generation (RAG) combines information retrieval with large language model generation to produce factual, grounded answers to user queries."}
+{"doc_id": "d9", "content": "FAISS is a library for efficient similarity search and clustering of dense vectors developed by Facebook AI Research. It supports multiple indexing strategies including IVF and HNSW."}
+{"doc_id": "d10", "content": "Elasticsearch provides full-text search and BM25 scoring as well as support for semantic search through vector fields and rank_features for sparse neural representations."}
+{"doc_id": "d11", "content": "Sentence transformers are models fine-tuned with contrastive learning objectives to produce semantically meaningful sentence embeddings useful for retrieval tasks."}
+{"doc_id": "d12", "content": "BM25 is a probabilistic retrieval model based on term frequency and inverse document frequency that has been a strong baseline for sparse retrieval for decades."}
+{"doc_id": "d13", "content": "HNSW (Hierarchical Navigable Small World) graphs enable approximate nearest neighbor search in high-dimensional spaces with logarithmic query time complexity."}
+{"doc_id": "d14", "content": "Quantization reduces the memory footprint of vector indexes by representing floating point values with fewer bits, enabling faster search with minimal accuracy loss."}
+{"doc_id": "d15", "content": "PostgreSQL with GIN indexes can be used for full-text search and sparse vector storage, providing a relational database alternative to dedicated search engines."}

@@ -1,0 +1,5 @@
+{"query_id": "q1", "relevant_doc_ids": ["d1", "d12", "d5"]}
+{"query_id": "q2", "relevant_doc_ids": ["d2", "d11", "d3"]}
+{"query_id": "q3", "relevant_doc_ids": ["d5", "d12", "d1"]}
+{"query_id": "q4", "relevant_doc_ids": ["d6", "d4", "d5"]}
+{"query_id": "q5", "relevant_doc_ids": ["d8", "d1", "d4"]}

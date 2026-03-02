@@ -1,0 +1,90 @@
+# =============================================================================
+# Vectorless Semantic Search System — Configuration
+# =============================================================================
+
+# --- SPLADE Sparse Encoder ---
+splade:
+  model_name: "naver/splade-cocondenser-ensembledistil"
+  max_length: 256
+  top_k: 100                  # Keep top-K terms per document
+  batch_size: 32
+  quantize: false             # Enable 8-bit weight quantization
+  device: "auto"              # "auto" | "cpu" | "cuda"
+
+# --- Dense Encoder (sentence-transformers) ---
+dense:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  embedding_dim: 384
+  max_length: 256
+  batch_size: 64
+  device: "auto"
+
+# --- Elasticsearch ---
+elasticsearch:
+  host: "http://localhost:9200"
+  index_name: "vectorless_search"
+  timeout: 30
+  bm25_weight: 0.4            # α for BM25
+  splade_weight: 0.6          # β for SPLADE rank_features
+  bulk_chunk_size: 500
+
+# --- HNSW (hnswlib) ---
+hnsw:
+  vocab_dim: 30522            # BERT vocabulary size
+  ef_construction: 200
+  M: 16
+  ef_search: 100
+  num_threads: 4
+  index_path: "data/hnsw_sparse.index"
+
+# --- FAISS (dense) ---
+faiss:
+  index_type: "IVFFlat"       # "Flat" | "IVFFlat" | "IVFPQ"
+  nlist: 100                  # IVF clusters
+  nprobe: 10                  # Clusters to search
+  index_path: "data/faiss_dense.index"
+
+# --- PostgreSQL ---
+postgres:
+  host: "localhost"
+  port: 5432
+  database: "vectorless_search"
+  user: "postgres"
+  password: "research_pass"
+  table_name: "documents"
+
+# --- Graph Expansion ---
+graph:
+  weight_threshold: 0.5       # Minimum SPLADE weight to create edge
+  max_neighbors: 50           # Max doc-doc edges per document
+  hop_decay: 0.5              # Decay factor per hop
+  gamma: 0.2                  # Graph score weight in final fusion
+
+# --- Hybrid Fusion ---
+fusion:
+  strategy: "linear"          # "linear" | "rrf"
+  alpha: 0.4                  # Sparse weight
+  beta: 0.4                   # Dense weight
+  gamma: 0.2                  # Graph weight
+  rrf_k: 60                   # RRF constant
+
+# --- RAG ---
+rag:
+  top_k: 5                    # Documents to retrieve for context
+  llm_backend: "openai"       # "openai" | "huggingface"
+  openai_model: "gpt-3.5-turbo"
+  hf_model: "google/flan-t5-base"
+  max_context_tokens: 2048
+  temperature: 0.1
+
+# --- Evaluation ---
+evaluation:
+  k_values: [5, 10, 20]
+  metrics: ["recall", "ndcg", "mrr"]
+  results_dir: "results"
+
+# --- Data ---
+data:
+  documents_path: "data/documents.jsonl"
+  queries_path: "data/queries.jsonl"
+  qrels_path: "data/qrels.jsonl"   # Ground-truth relevance judgments

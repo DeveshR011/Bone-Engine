@@ -1,0 +1,25 @@
+# =============================================================================
+# GPU Override for docker-compose
+# =============================================================================
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up --build engine
+#
+# Prerequisites:
+#   - NVIDIA GPU driver on host (nvidia-smi must work)
+#   - NVIDIA Container Toolkit installed
+# =============================================================================
+
+services:
+  engine:
+    build:
+      dockerfile: Dockerfile.gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility

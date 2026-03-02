@@ -1,0 +1,96 @@
+# =============================================================================
+# Vectorless Semantic Search System — Docker Configuration
+# =============================================================================
+# This config overrides hostnames for docker-compose service names.
+# Mount this as config.yaml inside the container, or copy to config.yaml
+# before running docker-compose.
+# =============================================================================
+
+# --- SPLADE Sparse Encoder ---
+splade:
+  model_name: "naver/splade-cocondenser-ensembledistil"
+  max_length: 256
+  top_k: 100
+  batch_size: 32
+  quantize: false
+  device: "auto"
+
+# --- Dense Encoder (sentence-transformers) ---
+dense:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  embedding_dim: 384
+  max_length: 256
+  batch_size: 64
+  device: "auto"
+
+# --- Elasticsearch ---
+# Uses docker-compose service name "elasticsearch"
+elasticsearch:
+  host: "http://elasticsearch:9200"
+  index_name: "vectorless_search"
+  timeout: 60
+  bm25_weight: 0.4
+  splade_weight: 0.6
+  bulk_chunk_size: 500
+
+# --- HNSW (hnswlib) ---
+hnsw:
+  vocab_dim: 30522
+  ef_construction: 200
+  M: 16
+  ef_search: 100
+  num_threads: 4
+  index_path: "data/hnsw_sparse.index"
+
+# --- FAISS (dense) ---
+faiss:
+  index_type: "IVFFlat"
+  nlist: 100
+  nprobe: 10
+  index_path: "data/faiss_dense.index"
+
+# --- PostgreSQL ---
+# Uses docker-compose service name "postgres"
+postgres:
+  host: "postgres"
+  port: 5432
+  database: "vectorless_search"
+  user: "postgres"
+  password: "research_pass"
+  table_name: "documents"
+
+# --- Graph Expansion ---
+graph:
+  weight_threshold: 0.5
+  max_neighbors: 50
+  hop_decay: 0.5
+  gamma: 0.2
+
+# --- Hybrid Fusion ---
+fusion:
+  strategy: "linear"
+  alpha: 0.4
+  beta: 0.4
+  gamma: 0.2
+  rrf_k: 60
+
+# --- RAG ---
+rag:
+  top_k: 5
+  llm_backend: "openai"
+  openai_model: "gpt-3.5-turbo"
+  hf_model: "google/flan-t5-base"
+  max_context_tokens: 2048
+  temperature: 0.1
+
+# --- Evaluation ---
+evaluation:
+  k_values: [5, 10, 20]
+  metrics: ["recall", "ndcg", "mrr"]
+  results_dir: "results"
+
+# --- Data ---
+data:
+  documents_path: "data/documents.jsonl"
+  queries_path: "data/queries.jsonl"
+  qrels_path: "data/qrels.jsonl"

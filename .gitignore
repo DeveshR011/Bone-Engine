@@ -1,0 +1,58 @@
+# =============================================================================
+# Bone Engine — .gitignore
+# =============================================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+
+# --- Virtual Environment ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Generated Data & Indexes ---
+data/splade_sparse.jsonl
+data/dense_embeddings.npy
+data/hnsw_sparse.index
+data/faiss_dense.index
+
+# --- Results ---
+results/experiments.csv
+results/query_results.jsonl
+
+# --- Environment / Secrets ---
+.env
+
+# --- HuggingFace Cache ---
+.cache/
+*.cache/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Docker volumes (local state) ---
+pg_data/
+es_data/
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*.ipynb
