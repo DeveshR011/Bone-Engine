@@ -1,0 +1,36 @@
+{
+  "scifact": {
+    "first_stage": 0.74457,
+    "bge-reranker-base@0.0": 0.74457,
+    "bge-reranker-base@0.2": 0.75941,
+    "bge-reranker-base@0.3": 0.76037,
+    "bge-reranker-base@0.5": 0.74809,
+    "bge-reranker-base@0.7": 0.73497,
+    "bge-reranker-base@0.85": 0.71159,
+    "bge-reranker-base@1.0": 0.69129,
+    "bge-reranker-v2-m3@0.0": 0.74457,
+    "bge-reranker-v2-m3@0.2": 0.75231,
+    "bge-reranker-v2-m3@0.3": 0.75291,
+    "bge-reranker-v2-m3@0.5": 0.74595,
+    "bge-reranker-v2-m3@0.7": 0.7444,
+    "bge-reranker-v2-m3@0.85": 0.73117,
+    "bge-reranker-v2-m3@1.0": 0.71519
+  },
+  "nfcorpus": {
+    "first_stage": 0.36646,
+    "bge-reranker-base@0.0": 0.36646,
+    "bge-reranker-base@0.2": 0.36286,
+    "bge-reranker-base@0.3": 0.3606,
+    "bge-reranker-base@0.5": 0.35358,
+    "bge-reranker-base@0.7": 0.34115,
+    "bge-reranker-base@0.85": 0.32405,
+    "bge-reranker-base@1.0": 0.30835,
+    "bge-reranker-v2-m3@0.0": 0.36646,
+    "bge-reranker-v2-m3@0.2": 0.37093,
+    "bge-reranker-v2-m3@0.3": 0.3708,
+    "bge-reranker-v2-m3@0.5": 0.36785,
+    "bge-reranker-v2-m3@0.7": 0.35636,
+    "bge-reranker-v2-m3@0.85": 0.34456,
+    "bge-reranker-v2-m3@1.0": 0.32653
+  }
+}

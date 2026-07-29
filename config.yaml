@@ -10,14 +10,46 @@ splade:
   batch_size: 32
   quantize: false             # Enable 8-bit weight quantization
   device: "auto"              # "auto" | "cpu" | "cuda"
+  fp16: true                  # Half precision (CUDA only; ignored on CPU)
 
 # --- Dense Encoder (sentence-transformers) ---
+# bge-base-en-v1.5 scores ~53 avg nDCG@10 on BEIR vs ~42 for all-MiniLM-L6-v2,
+# at 109M params / 768 dims. Use bge-small-en-v1.5 (33M, 384 dims) if VRAM is
+# tight; drop max_length to 256 to roughly halve encoding time.
 dense:
-  model_name: "sentence-transformers/all-MiniLM-L6-v2"
-  embedding_dim: 384
-  max_length: 256
+  model_name: "BAAI/bge-base-en-v1.5"
+  embedding_dim: 768
+  max_length: 512
   batch_size: 64
   device: "auto"
+  fp16: true
+
+# --- Cross-Encoder Reranker ---
+# Cost is linear in rerank_top_n, so that knob trades latency against nDCG.
+#
+# blend_weight is how much authority the reranker gets over the first stage:
+# 0.0 ignores it, 1.0 lets it overwrite the ranking outright. It is NOT 1.0
+# because that measurably destroys good rankings — these encoders are trained
+# on question->passage relevance and misjudge claim-style and keyword queries.
+# Measured on SciFact (see results/blend_sweep.json):
+#     blend 0.0 -> 0.7446   blend 0.3 -> 0.7604   blend 1.0 -> 0.6913
+# Both rerankers peak at 0.2-0.3 and degrade monotonically above it.
+# Re-tune with: python scripts/tune_rerank_blend.py
+reranker:
+  model_name: "BAAI/bge-reranker-v2-m3"
+  max_length: 512
+  batch_size: 32
+  device: "auto"
+  fp16: true
+  blend_weight: 0.3
+  blend_k: 60
+
+# --- Benchmarking ---
+benchmark:
+  datasets: ["scifact", "nfcorpus", "fiqa", "trec-covid"]
+  rerank_top_n: 100           # Candidates passed to the cross-encoder
+  final_k: 10                 # Cutoff for the headline nDCG@10
+  cache_dir: "data/beir"
 
 # --- Elasticsearch ---
 elasticsearch:
@@ -61,11 +93,19 @@ graph:
   gamma: 0.2                  # Graph score weight in final fusion
 
 # --- Hybrid Fusion ---
+# Linear wins once scores normalize into [SCORE_FLOOR, 1] instead of [0, 1]:
+# it keeps the *margin* between candidates, which RRF discards by design.
+# Measured (see results/fusion_sweep.json, nDCG@10 averaged over
+# SciFact + NFCorpus):
+#     linear a=0.4 -> 0.5701    rrf a=0.2 -> 0.5633
+#     rrf    a=0.4 -> 0.5555    dense only -> 0.5577
+# RRF remains the safer choice when a retriever's scores are uncalibrated or
+# unbounded; re-check with: python scripts/tune_fusion.py
 fusion:
   strategy: "linear"          # "linear" | "rrf"
   alpha: 0.4                  # Sparse weight
-  beta: 0.4                   # Dense weight
-  gamma: 0.2                  # Graph weight
+  beta: 0.6                   # Dense weight
+  gamma: 0.0                  # Graph weight (0 disables the graph branch)
   rrf_k: 60                   # RRF constant
 
 # --- RAG ---

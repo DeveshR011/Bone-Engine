@@ -3,10 +3,23 @@ Hybrid Fusion
 =============
 Merges results from sparse, dense, and graph retrieval systems using:
   A) Weighted linear combination of normalized scores
-  B) Reciprocal Rank Fusion (RRF)
+  B) Weighted Reciprocal Rank Fusion (RRF)
 
 Design: all merge functions accept lists of (doc_id, score) result lists
 and produce a unified ranked list.
+
+Normalization contract
+----------------------
+Retrieved documents are normalized into ``[SCORE_FLOOR, 1.0]`` rather than
+``[0.0, 1.0]``. This keeps two cases distinguishable:
+
+  * a document a retriever ranked **last**  -> receives ``SCORE_FLOOR``
+  * a document a retriever **never returned** -> contributes nothing
+
+Collapsing the worst-ranked document to exactly 0.0 makes those two cases
+identical, which lets a single confident retriever be outvoted by documents
+that another retriever actively ranked at the bottom. That defect made fused
+rankings score *below* their own best input.
 """
 
 from __future__ import annotations
@@ -18,13 +31,17 @@ from ..utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
+# Minimum normalized credit given to a retrieved document. Must be > 0 so that
+# "ranked last" outranks "not retrieved at all".
+SCORE_FLOOR = 0.1
+
 
 class HybridFusion:
     """Fuse multiple ranked lists into a single ranking."""
 
     def __init__(
         self,
-        strategy: str = "linear",
+        strategy: str = "rrf",
         alpha: float = 0.4,       # sparse weight
         beta: float = 0.4,        # dense weight
         gamma: float = 0.2,       # graph weight
@@ -66,37 +83,28 @@ class HybridFusion:
     ) -> list[dict[str, Any]]:
         """FinalScore = α * sparse_norm + β * dense_norm + γ * graph_norm.
 
-        Scores are min-max normalized within each result list before combining.
+        Scores are normalized within each result list before combining, since
+        BM25 sums, SPLADE dot products, and cosine similarities live on
+        incomparable scales.
         """
-        sparse_scores = self._normalize_scores(sparse_results)
-        dense_scores = self._normalize_scores(dense_results)
-        graph_scores = self._normalize_scores(graph_results or [])
+        weighted = [
+            (self._normalize_scores(sparse_results), self.alpha),
+            (self._normalize_scores(dense_results), self.beta),
+            (self._normalize_scores(graph_results or []), self.gamma),
+        ]
 
-        # Merge all doc_ids
-        all_docs: dict[str, dict[str, Any]] = {}
+        all_docs: dict[str, float] = defaultdict(float)
+        for scores, weight in weighted:
+            for doc_id, s in scores.items():
+                all_docs[doc_id] += weight * s
 
-        for doc_id, s in sparse_scores.items():
-            all_docs.setdefault(doc_id, {"doc_id": doc_id, "score": 0.0, "content": ""})
-            all_docs[doc_id]["score"] += self.alpha * s
+        content_map = self._collect_content(sparse_results, dense_results, graph_results)
 
-        for doc_id, s in dense_scores.items():
-            all_docs.setdefault(doc_id, {"doc_id": doc_id, "score": 0.0, "content": ""})
-            all_docs[doc_id]["score"] += self.beta * s
-
-        for doc_id, s in graph_scores.items():
-            all_docs.setdefault(doc_id, {"doc_id": doc_id, "score": 0.0, "content": ""})
-            all_docs[doc_id]["score"] += self.gamma * s
-
-        # Attach content from any source
-        content_map = {}
-        for r in sparse_results + dense_results + (graph_results or []):
-            if r.get("content"):
-                content_map[r["doc_id"]] = r["content"]
-        for doc in all_docs.values():
-            doc["content"] = content_map.get(doc["doc_id"], "")
-
-        ranked = sorted(all_docs.values(), key=lambda x: x["score"], reverse=True)
-        return ranked
+        ranked = sorted(all_docs.items(), key=lambda kv: kv[1], reverse=True)
+        return [
+            {"doc_id": doc_id, "score": score, "content": content_map.get(doc_id, "")}
+            for doc_id, score in ranked
+        ]
 
     # ------------------------------------------------------------------
     # Reciprocal Rank Fusion
@@ -108,25 +116,29 @@ class HybridFusion:
         dense_results: list[dict[str, Any]],
         graph_results: list[dict[str, Any]] | None,
     ) -> list[dict[str, Any]]:
-        """RRF score = Σ  1 / (k + rank_i)  for each system i."""
+        """Weighted RRF:  score = Σ_i  w_i / (k + rank_i).
+
+        Rank-based, so it is immune to the score-scale mismatch between
+        retrievers — the reason it is the default strategy. Weights let a
+        retriever known to be stronger on a corpus contribute more without
+        reintroducing any dependence on raw score magnitude.
+        """
         k = self.rrf_k
         fused: dict[str, float] = defaultdict(float)
-        content_map: dict[str, str] = {}
 
-        for result_list in [sparse_results, dense_results, graph_results or []]:
+        for result_list, weight in [
+            (sparse_results, self.alpha),
+            (dense_results, self.beta),
+            (graph_results or [], self.gamma),
+        ]:
             for rank, r in enumerate(result_list, start=1):
-                doc_id = r["doc_id"]
-                fused[doc_id] += 1.0 / (k + rank)
-                if r.get("content"):
-                    content_map[doc_id] = r["content"]
+                fused[r["doc_id"]] += weight / (k + rank)
 
-        ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)
+        content_map = self._collect_content(sparse_results, dense_results, graph_results)
+
+        ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)
         return [
-            {
-                "doc_id": doc_id,
-                "score": score,
-                "content": content_map.get(doc_id, ""),
-            }
+            {"doc_id": doc_id, "score": score, "content": content_map.get(doc_id, "")}
             for doc_id, score in ranked
         ]
 
@@ -135,13 +147,39 @@ class HybridFusion:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _collect_content(*result_lists: list[dict[str, Any]] | None) -> dict[str, str]:
+        """Gather doc content from whichever retriever happened to carry it."""
+        content_map: dict[str, str] = {}
+        for results in result_lists:
+            for r in results or []:
+                if r.get("content"):
+                    content_map[r["doc_id"]] = r["content"]
+        return content_map
+
+    @staticmethod
     def _normalize_scores(
         results: list[dict[str, Any]],
     ) -> dict[str, float]:
-        """Min-max normalize scores to [0, 1]."""
+        """Min-max normalize scores into [SCORE_FLOOR, 1.0].
+
+        Documents absent from ``results`` are simply missing from the returned
+        mapping and contribute 0.0 downstream — strictly less than the
+        SCORE_FLOOR floor given to the worst *retrieved* document.
+        """
         if not results:
             return {}
+
         scores = [r["score"] for r in results]
         mn, mx = min(scores), max(scores)
-        rng = mx - mn if mx != mn else 1.0
-        return {r["doc_id"]: (r["score"] - mn) / rng for r in results}
+
+        if mx == mn:
+            # A single result, or a tie across all results: no ordering
+            # information to preserve, so give every document full credit.
+            return {r["doc_id"]: 1.0 for r in results}
+
+        rng = mx - mn
+        span = 1.0 - SCORE_FLOOR
+        return {
+            r["doc_id"]: SCORE_FLOOR + span * ((r["score"] - mn) / rng)
+            for r in results
+        }

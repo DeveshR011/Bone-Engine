@@ -26,6 +26,9 @@ data/dense_embeddings.npy
 data/hnsw_sparse.index
 data/faiss_dense.index
 
+# Downloaded BEIR corpora — re-fetched automatically by scripts/run_beir.py
+data/beir/
+
 # --- Results ---
 results/experiments.csv
 results/query_results.jsonl

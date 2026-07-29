@@ -14,14 +14,33 @@ splade:
   batch_size: 32
   quantize: false
   device: "auto"
+  fp16: true
 
 # --- Dense Encoder (sentence-transformers) ---
+# Keep in sync with config.yaml — a mismatch makes container results silently
+# incomparable to local ones.
 dense:
-  model_name: "sentence-transformers/all-MiniLM-L6-v2"
-  embedding_dim: 384
-  max_length: 256
+  model_name: "BAAI/bge-base-en-v1.5"
+  embedding_dim: 768
+  max_length: 512
   batch_size: 64
   device: "auto"
+  fp16: true
+
+# --- Cross-Encoder Reranker ---
+reranker:
+  model_name: "BAAI/bge-reranker-base"
+  max_length: 512
+  batch_size: 32
+  device: "auto"
+  fp16: true
+
+# --- Benchmarking ---
+benchmark:
+  datasets: ["scifact", "nfcorpus", "fiqa", "trec-covid"]
+  rerank_top_n: 100
+  final_k: 10
+  cache_dir: "data/beir"
 
 # --- Elasticsearch ---
 # Uses docker-compose service name "elasticsearch"
@@ -70,8 +89,8 @@ graph:
 fusion:
   strategy: "linear"
   alpha: 0.4
-  beta: 0.4
-  gamma: 0.2
+  beta: 0.6
+  gamma: 0.0
   rrf_k: 60
 
 # --- RAG ---

@@ -14,6 +14,7 @@ Design note:
 from __future__ import annotations
 
 import os
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -175,12 +176,25 @@ class HNSWSparseBackend:
 
     @staticmethod
     def _token_to_index(token: str, tokenizer: Any = None) -> int:
-        """Map a token string to a dimension index."""
+        """Map a token string to a dimension index.
+
+        Uses ``convert_tokens_to_ids``, the exact inverse of the mapping that
+        produced these token strings. Round-tripping through ``encode()``
+        instead is lossy for subwords: ``##ing`` is re-tokenized as new text
+        rather than looked up, landing on a different dimension.
+        """
         if tokenizer is not None:
-            ids = tokenizer.encode(token, add_special_tokens=False)
-            return ids[0] if ids else -1
-        # Fallback: deterministic hash
-        return hash(token) % 30522
+            token_id = tokenizer.convert_tokens_to_ids(token)
+            unk = getattr(tokenizer, "unk_token_id", None)
+            if token_id is None or (unk is not None and token_id == unk):
+                return -1
+            return token_id
+
+        # Fallback when no tokenizer is supplied. Must be stable across
+        # processes: the builtin hash() is randomized per interpreter by
+        # PYTHONHASHSEED, so an index built in one run would be queried
+        # against different dimensions in the next.
+        return zlib.crc32(token.encode("utf-8")) % 30522
 
     def get_index_size_mb(self) -> float:
         if self.index_path and os.path.exists(self.index_path):
