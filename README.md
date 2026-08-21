@@ -288,6 +288,35 @@ both unseen datasets, so it generalises across query shapes. A corpus of purely
 natural-language questions may support a higher weight; measure with
 `scripts/tune_rerank_blend.py` rather than assuming.
 
+### Two evaluation paths, and an older table you may have seen
+
+The repository contains two evaluation entry points, and only one of them
+produces reportable numbers.
+
+| Path | Data | Status |
+|---|---|---|
+| `scripts/run_beir.py` | Full BEIR corpora, up to 171k documents | The benchmark. Produces the table above. |
+| `scripts/evaluate.py` | `data/*.jsonl`, a 15-document fixture | Smoke test for the legacy Elasticsearch/PostgreSQL path. Not reportable. |
+
+An earlier version of this README published results from the second path: seven
+methods scored over 15 documents and 5 queries, with three backends at
+Recall@10 = 1.000 and **Hybrid Fusion ranked last**. Both of those figures were
+real outputs, and both were misleading, for different reasons:
+
+- **The perfect recall was an artifact of corpus size.** A Recall@10 cutoff over
+  a 15-document collection returns two-thirds of the corpus, so any method
+  approaches 1.0. That measured the fixture, not the retriever.
+- **Fusion ranking last was a genuine bug**, not a property of fusion. Score
+  normalisation mapped the worst-ranked document to exactly 0.0, making it
+  indistinguishable from a document the retriever never returned, so fused
+  rankings could score below their own best input. It is fixed, and pinned by
+  regression tests in `tests/test_fusion.py`.
+
+On full corpora with that defect corrected, fusion beats **every** individual
+retriever it combines, on all four datasets (0.5946 against 0.5758 for dense
+alone). The old table is not evidence against the current architecture; it is
+the record of the bug that motivated fixing it.
+
 ### Positioning
 
 This is a correct, validated, competitive system for its weight class (110M

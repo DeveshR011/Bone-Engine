@@ -2,8 +2,21 @@
 """
 evaluate.py
 ===========
-Load query results and ground-truth relevance judgments, compute IR metrics
-(Recall@K, nDCG@K, MRR), and log to CSV.
+Scores the LEGACY pipeline against whatever JSONL sits in ``data/``.
+
+THIS IS NOT THE BENCHMARK. By default ``data/`` holds a 15-document,
+5-query smoke-test fixture whose only purpose is to prove the legacy
+Elasticsearch/PostgreSQL path runs end to end. Metrics computed over a
+collection that small measure corpus size rather than retrieval quality:
+retrieving 10 documents from a 15-document corpus returns two-thirds of it,
+so Recall@10 approaches 1.0 for any method, and per-system differences are
+dominated by which of five queries happened to land.
+
+For measured retrieval quality, use the BEIR benchmark instead:
+
+    python scripts/run_beir.py --datasets scifact nfcorpus fiqa trec-covid
+
+which scores full corpora with pytrec_eval and writes results/beir_results.json.
 
 Usage:
     python scripts/evaluate.py --config config.yaml
@@ -23,6 +36,10 @@ from src.evaluation.metrics import EvaluationMetrics
 from src.utils.logging_utils import get_logger, load_config
 
 logger = get_logger("evaluate")
+
+# Below this many judged queries, per-system differences are dominated by
+# which individual queries happened to land rather than by method quality.
+MIN_MEANINGFUL_QUERIES = 50
 
 
 def load_qrels(path: str) -> dict[str, set[str]]:
@@ -69,6 +86,25 @@ def main():
     qrels = load_qrels(qrels_path)
     results = load_results(args.results)
     logger.info("Loaded %d qrels, %d query results", len(qrels), len(results))
+
+    # A collection this small cannot separate retrieval methods: the cutoff
+    # approaches the corpus size, so every system converges toward perfect
+    # recall and the ranking differences are noise over a handful of queries.
+    # Emit an unmissable warning rather than let these numbers be quoted.
+    if len(qrels) < MIN_MEANINGFUL_QUERIES:
+        logger.warning("=" * 72)
+        logger.warning(
+            "SMOKE TEST ONLY - %d queries is far below the %d needed for a "
+            "meaningful evaluation.", len(qrels), MIN_MEANINGFUL_QUERIES,
+        )
+        logger.warning(
+            "These numbers measure fixture size, not retrieval quality, and "
+            "must not be reported as benchmark results."
+        )
+        logger.warning(
+            "For measured quality run:  python scripts/run_beir.py --datasets scifact"
+        )
+        logger.warning("=" * 72)
 
     evaluator = EvaluationMetrics()
 
